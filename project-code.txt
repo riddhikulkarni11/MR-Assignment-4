@@ -1,0 +1,162 @@
+from time import sleep
+import xlsxwriter
+from SX127x.LoRa import *
+
+from SX127x.board_config import BOARD
+import pandas as pd
+import datetime
+
+
+BOARD.setup()
+
+
+class LoRaRcvCont(LoRa):
+
+def __init__(self, verbose=False):
+
+super(LoRaRcvCont, self).__init__(verbose)
+
+self.set_mode(MODE.SLEEP)
+
+self.set_dio_mapping([0] * 6)
+
+
+def start(self):
+print("started..")
+
+self.reset_ptr_rx()
+
+self.set_mode(MODE.RXCONT)
+
+while True:
+pass
+
+#sleep(.5)
+#print("While loop")
+
+#rssi_value = self.get_rssi_value()
+#print(rssi_value)
+
+#status = self.get_modem_status()
+#print("got rssi and status")
+
+#sys.stdout.flush()
+
+
+
+
+def on_rx_done(self):
+
+print("\nReceived: ")
+
+self.clear_irq_flags(RxDone=1)
+
+payload = self.read_payload(nocheck=True)
+
+#print(bytes(payload).decode("utf-8",'ignore'))
+payload_1=bytes(payload).decode("utf-8",'ignore')
+#print(payload_1)
+
+payload_2 = payload_1.split('\n')
+print(payload_2)
+lines = [line.strip() for line in payload_2]
+#print(lines)
+df = pd.read_excel('/home/riddhi/Desktop/output2.xlsx')
+df.drop(df.columns[df.columns.str.contains('unnamed',case = False)],axis = 1, inplace = True)
+#workbook = xlsxwriter.Workbook('/home/riddhi/Desktop/output.xlsx')
+#worksheet = workbook.add_worksheet()
+data = []
+#df = pd.DataFrame()
+try:
+for line in lines:
+#print(line)
+if 'Hours the bulb is ON' in line:
+date = datetime.datetime.now().strftime("%d-%m-%Y %H:%M")
+hours_on = float(line.split(':')[1].strip('hrs'))
+#data['datetime'] = datetime.datetime.now()
+#data['hours_on'] = float(line.split(':')[1].strip('hrs'))
+elif 'the energy used is' in line:
+energy_used = float(line.split(':')[1].strip('kwH'))
+#data['energy_used'] = line.split(':')[1].strip('kWh')
+elif 'cost of electricity consumed is' in line:
+cost = float(line.split(':')[1].strip(' INR'))
+#data['cost'] = float(line.split(':')[1].strip(' INR'))
+data.append([date,hours_on,energy_used,cost])
+#for row_num, row_data in enumerate(data):
+# for col_num, col_data in enumerate(row_data):
+# worksheet.write(row_num, col_num, col_data)
+new_df = pd.DataFrame(data, columns=['date', 'hours_on', 'energy_used', 'cost'])
+df = pd.concat([df, new_df], ignore_index=True)
+df.to_excel('/home/riddhi/Desktop/output2.xlsx')
+#df = pd.DataFrame()
+#df = pd.concat([df, pd.DataFrame({'datetime': [date],'hours_on':[hours_on],'energy_used': [energy_used],'cost': [cost]})], ignore_index=True)
+except:
+date = ''
+hours_on = ''
+energy_used = ''
+cost = ''
+#data.append([date,hours_on,energy_used,cost])
+#new_df = pd.DataFrame(data, columns=['date', 'hours_on', 'energy_used', 'cost'])
+#df = pd.concat([df, new_df], ignore_index=True)
+#df.to_excel('/home/riddhi/Desktop/output1.xlsx')
+#df = pd.DataFrame()
+#df = pd.concat([df, pd.DataFrame({'datetime': [date],'hours_on':[hours_on],'energy_used': [energy_used],'cost': [cost]})], ignore_index=True)
+#df = pd.DataFrame(data, index=[0])
+#df.set_index('datetime',inplace=True)
+#df['date_time'] = datetime.datetime.now()
+#df.to_excel('output.xlsx', index=False)
+#for row_num, row_data in enumerate(data):
+# for col_num, col_data in enumerate(row_data):
+# worksheet.write(row_num, col_num, col_data)
+
+
+print(data)
+
+#workbook.close()
+#print('LoRa payload data has been written to {excel_file}')
+
+self.set_mode(MODE.SLEEP)
+
+self.reset_ptr_rx()
+
+self.set_mode(MODE.RXCONT)
+
+#workbook.close()
+lora = LoRaRcvCont(verbose=False)
+
+lora.set_mode(MODE.STDBY)
+lora.set_freq(433)
+lora.set_spreading_factor(7) # 7-12
+lora.set_bw(7) # 0-9
+lora.set_coding_rate(1) # 1-4
+lora.clear_irq_flags(RxDone=1)
+print(lora)
+
+# Medium Range Defaults after init are 434.0MHz, Bw = 125 kHz, Cr = 4/5, Sf = 128chips/symbol, CRC on 13 dBm
+
+
+lora.set_pa_config(pa_select=1)
+
+
+try:
+print("...")
+lora.start()
+print("end..")
+
+except KeyboardInterrupt:
+
+sys.stdout.flush()
+
+print("exception occured..")
+
+sys.stderr.write("KeyboardInterrupt\n")
+
+finally:
+
+sys.stdout.flush()
+
+print("finally done...")
+
+lora.set_mode(MODE.SLEEP)
+
+BOARD.teardown()
